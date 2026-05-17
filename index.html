@@ -184,8 +184,10 @@ async function doJoin() {
 function setErr(m) { document.getElementById('errMsg').textContent = m; }
 
 async function initRTC() {
-  AgoraRTC.setLogLevel(0); // 关闭所有日志，防止触发设备枚举
-  client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+  AgoraRTC.setLogLevel(0);
+  // 以观众身份加入，完全不发布音频，不触发麦克风
+  client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+  await client.setClientRole('audience');
 
   client.on('user-published', async (user, type) => {
     await client.subscribe(user, type);
@@ -207,7 +209,6 @@ async function initRTC() {
     if (n) addSys(n + ' 离开了频道');
   });
 
-  // 只加入频道，完全不碰麦克风
   myUid = await client.join(APP_ID, roomCode, TOKEN, null);
   members['me'] = { name: myName, emoji: myEmoji, speaking: false };
 }
@@ -287,6 +288,8 @@ async function pttOn() {
   members['me'].speaking = true;
   renderMembers();
   try {
+    // 切换成主播角色才能发布音频
+    await client.setClientRole('host');
     localTrack = await AgoraRTC.createMicrophoneAudioTrack({
       encoderConfig: 'speech_standard',
       AEC: true, ANS: true, AGC: true
@@ -318,6 +321,8 @@ async function pttOff() {
       localTrack.close();
       localTrack = null;
     }
+    // 松开后切回观众，停止发布
+    await client.setClientRole('audience');
   } catch(e) { console.warn('pttOff:', e); }
   addVoice(myName, myEmoji, dur, true);
 }
