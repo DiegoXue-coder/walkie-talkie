@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>全球对讲</title>
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.screen { display: none; flex-direction: column; height: 100vh; }
+.screen.active { display: flex; }
+.join-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem 1.5rem; }
+.logo { width:72px; height:72px; background:#7F77DD; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem; }
+.logo svg { width:36px; height:36px; fill:white; }
+h1 { font-size:24px; font-weight:700; margin-bottom:4px; }
+.sub { font-size:14px; color:#666; margin-bottom:2rem; }
+.card { background:#161616; border:0.5px solid #2a2a2a; border-radius:18px; padding:1.5rem; width:100%; max-width:360px; }
+.lbl { font-size:12px; color:#666; margin-bottom:6px; }
+.row { display:flex; gap:10px; margin-bottom:1rem; align-items:center; }
+.emo { width:46px; height:46px; background:#222; border:1px solid #333; border-radius:50%; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+input.fi { flex:1; background:#222; border:1px solid #2e2e2e; border-radius:10px; padding:12px 14px; color:#fff; font-size:15px; outline:none; width:100%; }
+input.fi::placeholder { color:#444; }
+input.fi:focus { border-color:#7F77DD; }
+.btn-p { width:100%; padding:14px; background:#7F77DD; border:none; border-radius:12px; color:white; font-size:16px; font-weight:600; cursor:pointer; margin-top:4px; }
+.btn-p:active { background:#534AB7; }
+.divider { display:flex; align-items:center; gap:10px; margin:14px 0; color:#444; font-size:12px; }
+.divider::before,.divider::after { content:''; flex:1; height:0.5px; background:#2a2a2a; }
+.btn-g { width:100%; padding:13px; background:transparent; border:0.5px solid #2e2e2e; border-radius:12px; color:#888; font-size:15px; cursor:pointer; }
+.err { color:#E24B4A; font-size:13px; margin-top:10px; text-align:center; min-height:18px; }
+.topbar { display:flex; align-items:center; padding:14px 16px 12px; border-bottom:0.5px solid #1e1e1e; flex-shrink:0; }
+.tb-info { flex:1; }
+.tb-title { font-size:15px; font-weight:600; }
+.tb-code { font-size:12px; color:#555; margin-top:2px; }
+.tb-code span { color:#9F99E6; font-weight:600; letter-spacing:1px; }
+.pill { background:#1a1a1a; border-radius:20px; padding:5px 10px; font-size:12px; color:#666; display:flex; align-items:center; gap:5px; }
+.dot { width:6px; height:6px; background:#1D9E75; border-radius:50%; animation:blink 1.8s infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+.mstrip { display:flex; gap:10px; padding:10px 16px; overflow-x:auto; border-bottom:0.5px solid #1a1a1a; flex-shrink:0; }
+.mstrip::-webkit-scrollbar { display:none; }
+.mi { display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; }
+.mav { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; border:2px solid transparent; transition:border-color 0.2s; }
+.mav.on { border-color:#7F77DD; box-shadow:0 0 10px rgba(127,119,221,0.4); }
+.mn { font-size:10px; color:#555; max-width:44px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.chat::-webkit-scrollbar { width:3px; }
+.chat::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:3px; }
+.sys { text-align:center; font-size:12px; color:#444; padding:2px 0; }
+.brow { display:flex; gap:8px; align-items:flex-end; }
+.brow.me { flex-direction:row-reverse; }
+.bav { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.bbody { max-width:72%; }
+.bwho { font-size:10px; color:#555; margin-bottom:3px; }
+.me .bwho { text-align:right; }
+.bbub { padding:9px 13px; border-radius:16px; font-size:14px; line-height:1.45; word-break:break-word; }
+.brow:not(.me) .bbub { background:#1e1e1e; color:#ddd; border-bottom-left-radius:4px; }
+.brow.me .bbub { background:#534AB7; color:#fff; border-bottom-right-radius:4px; }
+.vbub { display:flex; align-items:center; gap:8px; }
+.wv { display:flex; gap:2px; align-items:center; height:20px; }
+.wv span { display:block; width:3px; border-radius:2px; background:currentColor; opacity:0.7; }
+.bot { padding:10px 16px 28px; border-top:0.5px solid #1a1a1a; flex-shrink:0; background:#0f0f0f; }
+.trow { display:flex; gap:8px; margin-bottom:14px; }
+.ti { flex:1; background:#1a1a1a; border:0.5px solid #2a2a2a; border-radius:22px; padding:10px 16px; color:#fff; font-size:14px; outline:none; }
+.ti:focus { border-color:#534AB7; }
+.sbtn { width:40px; height:40px; background:#7F77DD; border:none; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.sbtn:active { transform:scale(0.9); }
+.ptt-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.ptt { width:76px; height:76px; border-radius:50%; border:2.5px solid #7F77DD; background:transparent; color:#7F77DD; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; transition:all 0.15s; user-select:none; -webkit-user-select:none; touch-action:none; }
+.ptt svg { width:26px; height:26px; fill:currentColor; pointer-events:none; }
+.ptt-lbl { font-size:10px; font-weight:600; pointer-events:none; }
+.ptt.on { background:#7F77DD; color:#fff; transform:scale(1.1); box-shadow:0 0 24px rgba(127,119,221,0.5); }
+.hint { font-size:11px; color:#444; }
+.ov { position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:99; }
+.spin { width:36px; height:36px; border:3px solid #333; border-top-color:#7F77DD; border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.ov-txt { font-size:15px; color:#888; }
+</style>
+</head>
+<body>
+
+<div class="screen active" id="sJoin">
+  <div class="join-wrap">
+    <div class="logo">
+      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 3a1 1 0 0 1 2 0v8a1 1 0 0 1-2 0V4zm-4 7H5a7 7 0 0 0 14 0h-2a5 5 0 0 1-10 0zm5 8v2h-2v2h6v-2h-2v-2h-2z"/></svg>
+    </div>
+    <h1>全球对讲</h1>
+    <p class="sub">和朋友实时语音 + 文字广播</p>
+    <div class="card">
+      <div class="lbl">你的昵称</div>
+      <div class="row">
+        <div class="emo" id="emoBt" onclick="cycleEmoji()">😎</div>
+        <input class="fi" id="nameIn" placeholder="输入昵称..." maxlength="12">
+      </div>
+      <div class="lbl">加入已有房间</div>
+      <input class="fi" id="codeIn" placeholder="输入房间码"
+        style="text-transform:uppercase;letter-spacing:3px;font-size:18px;text-align:center;margin-bottom:10px;" maxlength="8">
+      <button class="btn-p" onclick="doJoin()">加入房间</button>
+      <div class="divider">或者</div>
+      <button class="btn-g" onclick="doCreate()">创建新房间</button>
+      <div class="err" id="errMsg"></div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="sMain">
+  <div class="topbar">
+    <div class="tb-info">
+      <div class="tb-title">对讲频道</div>
+      <div class="tb-code">房间码 <span id="dispCode">——</span></div>
+    </div>
+    <div class="pill">
+      <div class="dot"></div>
+      <span id="onlineCnt">1</span> 在线
+    </div>
+  </div>
+  <div class="mstrip" id="mStrip"></div>
+  <div class="chat" id="chatArea">
+    <div class="sys">频道已就绪 · 开始对讲吧</div>
+  </div>
+  <div class="bot">
+    <div class="trow">
+      <input class="ti" id="textIn" placeholder="发文字广播..." maxlength="200"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();doSend();}">
+      <button class="sbtn" onclick="doSend()">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div class="ptt-wrap">
+      <button class="ptt" id="pttBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 3a1 1 0 0 1 2 0v8a1 1 0 0 1-2 0V4zm-4 7H5a7 7 0 0 0 14 0h-2a5 5 0 0 1-10 0zm5 8v2h-2v2h6v-2h-2v-2h-2z"/></svg>
+        <span class="ptt-lbl" id="pttLbl">按住说话</span>
+      </button>
+      <div class="hint">按住麦克风键开始语音对讲</div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov" style="display:none;">
+  <div class="spin"></div>
+  <div class="ov-txt" id="ovTxt">正在连接...</div>
+</div>
+
+<script>
+const APP_ID = '0d1690b0d3b241a08b7c5ca5173257d8';
+const TOKEN  = null;
+
+const EMOJIS = ['😎','🦊','🐼','🦄','🔥','⚡','🌊','🎯','🎮','🚀','🐯','🌙'];
+let emoIdx = 0;
+let myName = '', myEmoji = '😎', myUid = 0, roomCode = '';
+let members = {};
+let pttActive = false, pttT = 0;
+let client = null, localTrack = null;
+
+function cycleEmoji() {
+  emoIdx = (emoIdx + 1) % EMOJIS.length;
+  document.getElementById('emoBt').textContent = EMOJIS[emoIdx];
+}
+
+function doCreate() {
+  const name = document.getElementById('nameIn').value.trim();
+  if (!name) { setErr('请输入昵称'); return; }
+  document.getElementById('codeIn').value = Math.random().toString(36).substring(2,8).toUpperCase();
+  doJoin();
+}
+
+async function doJoin() {
+  const name = document.getElementById('nameIn').value.trim();
+  const code = document.getElementById('codeIn').value.trim().toUpperCase();
+  if (!name) { setErr('请输入昵称'); return; }
+  if (code.length < 4) { setErr('请输入有效房间码'); return; }
+  myName = name; myEmoji = EMOJIS[emoIdx]; roomCode = code;
+  showOv('正在连接...');
+  try {
+    await initRTC();
+    hideOv();
+    goMain();
+  } catch(e) {
+    hideOv();
+    setErr('连接失败：' + e.message);
+    console.error(e);
+  }
+}
+
+function setErr(m) { document.getElementById('errMsg').textContent = m; }
+
+async function initRTC() {
+  AgoraRTC.setLogLevel(0); // 关闭所有日志，防止触发设备枚举
+  client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+  client.on('user-published', async (user, type) => {
+    await client.subscribe(user, type);
+    if (type === 'audio') {
+      user.audioTrack.play();
+      setSpeaking(String(user.uid), true);
+    }
+  });
+
+  client.on('user-unpublished', (user, type) => {
+    if (type === 'audio') setSpeaking(String(user.uid), false);
+  });
+
+  client.on('user-left', (user) => {
+    const uid = String(user.uid);
+    const n = members[uid] ? members[uid].name : '';
+    delete members[uid];
+    renderMembers();
+    if (n) addSys(n + ' 离开了频道');
+  });
+
+  // 只加入频道，完全不碰麦克风
+  myUid = await client.join(APP_ID, roomCode, TOKEN, null);
+  members['me'] = { name: myName, emoji: myEmoji, speaking: false };
+}
+
+function goMain() {
+  document.getElementById('sJoin').classList.remove('active');
+  document.getElementById('sMain').classList.add('active');
+  document.getElementById('dispCode').textContent = roomCode;
+  addSys('你已加入频道 · 房间码 ' + roomCode);
+  renderMembers();
+
+  const btn = document.getElementById('pttBtn');
+  btn.style.touchAction = 'none';
+  btn.addEventListener('pointerdown',   (e) => { e.preventDefault(); pttOn(); });
+  btn.addEventListener('pointerup',     (e) => { e.preventDefault(); pttOff(); });
+  btn.addEventListener('pointerleave',  (e) => { e.preventDefault(); pttOff(); });
+  btn.addEventListener('pointercancel', (e) => { e.preventDefault(); pttOff(); });
+
+  window.addEventListener('beforeunload', () => {
+    if (localTrack) { localTrack.stop(); localTrack.close(); }
+    client.leave();
+  });
+}
+
+function setSpeaking(uid, val) {
+  if (members[uid]) { members[uid].speaking = val; renderMembers(); }
+}
+
+function renderMembers() {
+  document.getElementById('onlineCnt').textContent = Object.keys(members).length;
+  document.getElementById('mStrip').innerHTML = Object.entries(members).map(([uid, m]) =>
+    `<div class="mi"><div class="mav ${m.speaking?'on':''}">${m.emoji}</div><div class="mn">${uid==='me'?'我':m.name}</div></div>`
+  ).join('');
+}
+
+function addSys(t) {
+  const el = document.createElement('div');
+  el.className = 'sys'; el.textContent = t; push(el);
+}
+
+function addBubble(name, emoji, msg, isMe) {
+  const el = document.createElement('div');
+  el.className = 'brow' + (isMe ? ' me' : '');
+  el.innerHTML = `<div class="bav">${emoji}</div><div class="bbody"><div class="bwho">${isMe?'我':name}</div><div class="bbub">${esc(msg)}</div></div>`;
+  push(el);
+}
+
+function addVoice(name, emoji, dur, isMe) {
+  const bars = [12,18,10,22,14,8,20,16,12].map(h=>`<span style="height:${h}px"></span>`).join('');
+  const el = document.createElement('div');
+  el.className = 'brow' + (isMe ? ' me' : '');
+  el.innerHTML = `<div class="bav">${emoji}</div><div class="bbody"><div class="bwho">${isMe?'我':name}</div><div class="bbub vbub">🎙 <div class="wv">${bars}</div> <span style="font-size:12px;opacity:.6">${dur}s</span></div></div>`;
+  push(el);
+}
+
+function push(el) {
+  const a = document.getElementById('chatArea');
+  a.appendChild(el); a.scrollTop = a.scrollHeight;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function doSend() {
+  const input = document.getElementById('textIn');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addBubble(myName, myEmoji, msg, true);
+}
+
+async function pttOn() {
+  if (pttActive) return;
+  pttActive = true;
+  pttT = Date.now();
+  document.getElementById('pttBtn').classList.add('on');
+  document.getElementById('pttLbl').textContent = '说话中...';
+  members['me'].speaking = true;
+  renderMembers();
+  try {
+    localTrack = await AgoraRTC.createMicrophoneAudioTrack({
+      encoderConfig: 'speech_standard',
+      AEC: true, ANS: true, AGC: true
+    });
+    await client.publish([localTrack]);
+  } catch(e) {
+    console.error('mic error:', e);
+    pttActive = false;
+    document.getElementById('pttBtn').classList.remove('on');
+    document.getElementById('pttLbl').textContent = '按住说话';
+    members['me'].speaking = false;
+    renderMembers();
+    if (localTrack) { localTrack.stop(); localTrack.close(); localTrack = null; }
+  }
+}
+
+async function pttOff() {
+  if (!pttActive) return;
+  pttActive = false;
+  document.getElementById('pttBtn').classList.remove('on');
+  document.getElementById('pttLbl').textContent = '按住说话';
+  members['me'].speaking = false;
+  renderMembers();
+  const dur = Math.max(1, Math.round((Date.now() - pttT) / 1000));
+  try {
+    if (localTrack) {
+      await client.unpublish([localTrack]);
+      localTrack.stop();
+      localTrack.close();
+      localTrack = null;
+    }
+  } catch(e) { console.warn('pttOff:', e); }
+  addVoice(myName, myEmoji, dur, true);
+}
+
+function showOv(t) { document.getElementById('ovTxt').textContent = t; document.getElementById('ov').style.display = 'flex'; }
+function hideOv() { document.getElementById('ov').style.display = 'none'; }
+</script>
+</body>
+</html>
